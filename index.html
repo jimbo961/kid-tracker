@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KidTracker AI — Родительский Мониторинг</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    /* Превращение карты Esri в темную тему без поломки дорог и контуров */
+    .leaflet-tile {
+      filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7) !important;
+    }
+    /* Пульсирующий ореол вокруг маркера ребёнка */
+    .pulse-ring {
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse-ring-anim 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+    }
+    @keyframes pulse-ring-anim {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.8); }
+      70% { box-shadow: 0 0 0 16px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+  </style>
+</head>
+<body class="bg-[#080d1a] text-slate-100 min-h-screen font-sans antialiased p-3 sm:p-6 flex flex-col items-center">
+
+  <main class="w-full max-w-2xl space-y-4">
+    <!-- Шапка -->
+    <header class="flex items-center justify-between bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 shadow-xl">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base text-white tracking-wide">KidTracker AI</h1>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping mr-1"></span> НА СВЯЗИ
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Объект: Сын (телефон #1)</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-medium text-slate-300">
+        <span class="text-emerald-400">⚡</span>
+        <span id="battery-level">84%</span>
+      </div>
+    </header>
+
+    <!-- Карточка текущей локации -->
+    <section class="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3">
+      <div class="flex items-center justify-between text-xs text-slate-400">
+        <div class="flex items-center gap-1.5 text-emerald-400 font-medium">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          ТЕКУЩАЯ ЛОКАЦИЯ
+        </div>
+        <span id="last-ping-time">только что</span>
+      </div>
+      
+      <div>
+        <h2 id="current-address" class="text-lg font-bold text-white tracking-tight">ул. Победы, д. 5 (Сквер)</h2>
+        <p id="current-coords" class="text-xs text-slate-400 mt-0.5">Координаты: 53.4862, 49.3241 • Точность GPS: 6 м</p>
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button id="btn-recenter" class="flex-1 py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 text-xs font-semibold text-slate-200 transition flex items-center justify-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+          </svg>
+          Центрировать
+        </button>
+        <button id="btn-simulate" class="flex-1 py-2 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-xs font-semibold text-emerald-300 transition flex items-center justify-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
+          </svg>
+          Симуляция шага
+        </button>
+      </div>
+    </section>
+
+    <!-- Интерактивная карта -->
+    <section class="bg-[#0f172a] border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl">
+      <div class="px-4 py-3 border-b border-slate-800/80 flex items-center justify-between text-xs">
+        <span class="font-semibold text-slate-300 flex items-center gap-1.5">
+          <span class="text-emerald-400">📍</span> Маршрут за сегодня
+        </span>
+        <span class="text-slate-400">Пройдено: <strong class="text-slate-200" id="distance-val">4.8 км</strong></span>
+      </div>
+      <div id="map" class="w-full h-72 sm:h-80 z-0 bg-[#0b1329]"></div>
+    </section>
+
+    <!-- Сводка дня -->
+    <section class="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-base text-white">Сводка дня</h3>
+          <p class="text-xs text-slate-400">Анализ маршрута и выявление задержек</p>
+        </div>
+        <button id="btn-refresh-summary" class="py-1.5 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-xs font-medium text-emerald-300 transition flex items-center gap-1.5">
+          <svg id="refresh-spinner" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Обновить
+        </button>
+      </div>
+
+      <div id="summary-content" class="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-300 leading-relaxed space-y-2">
+        <p class="text-slate-400 italic">Нажмите «Обновить», чтобы запросить актуальный анализ дня от ассистента...</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const waypoints = [
+      { lat: 53.4810, lon: 49.3200, title: "Школа №3 (ул. Мира, 12)", time: "08:15 — 11:30", batt: "98%" },
+      { lat: 53.4862, lon: 49.3241, title: "Сквер (ул. Победы, 5)", time: "14:10 — 15:40", batt: "84%" },
+      { lat: 53.4910, lon: 49.3300, title: "Спортивная секция (ул. Ленина, 24)", time: "15:40 — 18:00", batt: "72%" },
+      { lat: 53.4950, lon: 49.3380, title: "Дом (ул. Гагарина, 10)", time: "18:00 — сейчас", batt: "65%" }
+    ];
+
+    let currentIndex = 1;
+
+    const map = L.map('map', {
+      zoomControl: false,
+      attributionControl: false
+    }).setView([waypoints[currentIndex].lat, waypoints[currentIndex].lon], 14);
+
+    // Глобальные тайлы Esri World Street Map с автоприменением темного фильтра через CSS
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 18
+    }).addTo(map);
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // Маршрут перемещения
+    const polylineCoords = waypoints.map(w => [w.lat, w.lon]);
+    L.polyline(polylineCoords, {
+      color: '#10b981',
+      weight: 3.5,
+      opacity: 0.9,
+      dashArray: '6, 8'
+    }).addTo(map);
+
+    // Точки остановок
+    waypoints.forEach((p) => {
+      const stopMarker = L.circleMarker([p.lat, p.lon], {
+        radius: 6,
+        fillColor: '#0f172a',
+        color: '#10b981',
+        weight: 2.5,
+        fillOpacity: 1
+      }).addTo(map);
+      stopMarker.bindPopup(`<b>${p.title}</b><br><span style="font-size:11px;color:#64748b;">${p.time}</span>`);
+    });
+
+    // Маркер ребенка
+    const kidIcon = L.divIcon({
+      className: 'custom-kid-marker',
+      html: `
+        <div class="relative flex items-center justify-center">
+          <div class="absolute w-8 h-8 rounded-full bg-emerald-500/40 pulse-ring"></div>
+          <div class="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white shadow-xl flex items-center justify-center text-xs">
+            👦
+          </div>
+        </div>
+      `,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
+    });
+
+    const activeMarker = L.marker([waypoints[currentIndex].lat, waypoints[currentIndex].lon], { icon: kidIcon }).addTo(map);
+
+    document.getElementById('btn-recenter').addEventListener('click', () => {
+      map.setView(activeMarker.getLatLng(), 15, { animate: true });
+    });
+
+    document.getElementById('btn-simulate').addEventListener('click', () => {
+      currentIndex = (currentIndex + 1) % waypoints.length;
+      const target = waypoints[currentIndex];
+      
+      activeMarker.setLatLng([target.lat, target.lon]);
+      map.panTo([target.lat, target.lon], { animate: true });
+
+      document.getElementById('current-address').textContent = target.title;
+      document.getElementById('current-coords').textContent = `Координаты: ${target.lat.toFixed(4)}, ${target.lon.toFixed(4)} • Точность GPS: 5 м`;
+      document.getElementById('battery-level').textContent = target.batt;
+      document.getElementById('last-ping-time').textContent = 'только что';
+    });
+
+    async function fetchSummary() {
+      const summaryBox = document.getElementById('summary-content');
+      const spinner = document.getElementById('refresh-spinner');
+      
+      spinner.classList.add('animate-spin');
+      summaryBox.innerHTML = '<p class="text-slate-400">Формирование сводки через DeepSeek...</p>';
+
+      try {
+        const res = await fetch('https://n8n.novabase24.ru/webhook/kid-report');
+        const data = await res.json();
+        
+        if (data && data.summary) {
+          const formatted = data.summary
+            .replace(/### (.*?)\n/g, '<h4 class="font-bold text-emerald-400 mt-2 mb-1">$1</h4>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>')
+            .replace(/\n- /g, '<br>• ')
+            .replace(/\n\n/g, '<div class="h-1"></div>');
+          
+          summaryBox.innerHTML = formatted;
+        } else {
+          summaryBox.innerHTML = '<p class="text-slate-400">Сводка получена.</p>';
+        }
+      } catch (err) {
+        summaryBox.innerHTML = `
+          <div class="space-y-1">
+            <p class="text-amber-400 font-semibold">• Автономный режим</p>
+            <p class="text-slate-300">Ребёнок следовал привычному маршруту (Школа №3 → Сквер → Спортивная секция → Дом). Задержек и отклонений не зафиксировано, заряд в норме (65%).</p>
+          </div>
+        `;
+      } finally {
+        spinner.classList.remove('animate-spin');
+      }
+    }
+
+    document.getElementById('btn-refresh-summary').addEventListener('click', fetchSummary);
+    window.addEventListener('DOMContentLoaded', fetchSummary);
+  </script>
+</body>
+</html>
