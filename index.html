@@ -47,7 +47,7 @@
       </div>
       <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-medium text-slate-300">
         <span class="text-emerald-400">⚡</span>
-        <span id="battery-level">84%</span>
+        <span id="battery-level">--%</span>
       </div>
     </header>
 
@@ -61,26 +61,20 @@
           </svg>
           ТЕКУЩАЯ ЛОКАЦИЯ
         </div>
-        <span id="last-ping-time">только что</span>
+        <span id="last-ping-time">ожидание данных</span>
       </div>
       
       <div>
-        <h2 id="current-address" class="text-lg font-bold text-white tracking-tight">ул. Победы, д. 5 (Сквер)</h2>
-        <p id="current-coords" class="text-xs text-slate-400 mt-0.5">Координаты: 53.4862, 49.3241 • Точность GPS: 6 м</p>
+        <h2 id="current-address" class="text-lg font-bold text-white tracking-tight">Определение адреса...</h2>
+        <p id="current-coords" class="text-xs text-slate-400 mt-0.5">Координаты: загрузка...</p>
       </div>
 
       <div class="flex gap-2 pt-1">
-        <button id="btn-recenter" class="flex-1 py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 text-xs font-semibold text-slate-200 transition flex items-center justify-center gap-1.5">
+        <button id="btn-recenter" class="w-full py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 text-xs font-semibold text-slate-200 transition flex items-center justify-center gap-1.5">
           <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
           </svg>
-          Центрировать
-        </button>
-        <button id="btn-simulate" class="flex-1 py-2 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-xs font-semibold text-emerald-300 transition flex items-center justify-center gap-1.5">
-          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
-          </svg>
-          Симуляция шага
+          Центрировать на карте
         </button>
       </div>
     </section>
@@ -91,7 +85,7 @@
         <span class="font-semibold text-slate-300 flex items-center gap-1.5">
           <span class="text-emerald-400">📍</span> Маршрут за сегодня
         </span>
-        <span class="text-slate-400">Пройдено: <strong class="text-slate-200" id="distance-val">4.8 км</strong></span>
+        <span class="text-slate-400">Статус: <strong class="text-slate-200" id="distance-val">В сети</strong></span>
       </div>
       <div id="map" class="w-full h-72 sm:h-80 z-0 bg-[#0b1329]"></div>
     </section>
@@ -101,7 +95,7 @@
       <div class="flex items-center justify-between">
         <div>
           <h3 class="font-bold text-base text-white">Сводка дня</h3>
-          <p class="text-xs text-slate-400">Анализ маршрута и выявление задержек</p>
+          <p class="text-xs text-slate-400">Анализ маршрута от DeepSeek AI</p>
         </div>
         <button id="btn-refresh-summary" class="py-1.5 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-xs font-medium text-emerald-300 transition flex items-center gap-1.5">
           <svg id="refresh-spinner" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,49 +112,30 @@
   </main>
 
   <script>
-    const waypoints = [
-      { lat: 53.4810, lon: 49.3200, title: "Школа №3 (ул. Мира, 12)", time: "08:15 — 11:30", batt: "98%" },
-      { lat: 53.4862, lon: 49.3241, title: "Сквер (ул. Победы, 5)", time: "14:10 — 15:40", batt: "84%" },
-      { lat: 53.4910, lon: 49.3300, title: "Спортивная секция (ул. Ленина, 24)", time: "15:40 — 18:00", batt: "72%" },
-      { lat: 53.4950, lon: 49.3380, title: "Дом (ул. Гагарина, 10)", time: "18:00 — сейчас", batt: "65%" }
-    ];
-
-    let currentIndex = 1;
+    // Инициализация карты по умолчанию (координаты Екатеринбурга / области)
+    let initialLat = 56.8572;
+    let initialLon = 60.6390;
 
     const map = L.map('map', {
       zoomControl: false,
       attributionControl: false
-    }).setView([waypoints[currentIndex].lat, waypoints[currentIndex].lon], 14);
+    }).setView([initialLat, initialLon], 15);
 
-    // Глобальные тайлы Esri World Street Map с автоприменением темного фильтра через CSS
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 18
     }).addTo(map);
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Маршрут перемещения
-    const polylineCoords = waypoints.map(w => [w.lat, w.lon]);
-    L.polyline(polylineCoords, {
+    let routeLine = L.polyline([], {
       color: '#10b981',
       weight: 3.5,
       opacity: 0.9,
       dashArray: '6, 8'
     }).addTo(map);
 
-    // Точки остановок
-    waypoints.forEach((p) => {
-      const stopMarker = L.circleMarker([p.lat, p.lon], {
-        radius: 6,
-        fillColor: '#0f172a',
-        color: '#10b981',
-        weight: 2.5,
-        fillOpacity: 1
-      }).addTo(map);
-      stopMarker.bindPopup(`<b>${p.title}</b><br><span style="font-size:11px;color:#64748b;">${p.time}</span>`);
-    });
+    let markersLayer = L.layerGroup().addTo(map);
 
-    // Маркер ребенка
     const kidIcon = L.divIcon({
       className: 'custom-kid-marker',
       html: `
@@ -175,24 +150,21 @@
       iconAnchor: [14, 14]
     });
 
-    const activeMarker = L.marker([waypoints[currentIndex].lat, waypoints[currentIndex].lon], { icon: kidIcon }).addTo(map);
+    let activeMarker = L.marker([initialLat, initialLon], { icon: kidIcon }).addTo(map);
 
     document.getElementById('btn-recenter').addEventListener('click', () => {
-      map.setView(activeMarker.getLatLng(), 15, { animate: true });
+      map.setView(activeMarker.getLatLng(), 16, { animate: true });
     });
 
-    document.getElementById('btn-simulate').addEventListener('click', () => {
-      currentIndex = (currentIndex + 1) % waypoints.length;
-      const target = waypoints[currentIndex];
-      
-      activeMarker.setLatLng([target.lat, target.lon]);
-      map.panTo([target.lat, target.lon], { animate: true });
-
-      document.getElementById('current-address').textContent = target.title;
-      document.getElementById('current-coords').textContent = `Координаты: ${target.lat.toFixed(4)}, ${target.lon.toFixed(4)} • Точность GPS: 5 м`;
-      document.getElementById('battery-level').textContent = target.batt;
-      document.getElementById('last-ping-time').textContent = 'только что';
-    });
+    // Функция форматирования Markdown текста ответа
+    function formatMarkdown(text) {
+      return text
+        .replace(/### (.*?)\n/g, '<h4 class="font-bold text-emerald-400 mt-2 mb-1">$1</h4>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>')
+        .replace(/\n- /g, '<br>• ')
+        .replace(/\n\n/g, '<div class="h-1.5"></div>')
+        .replace(/\n/g, '<br>');
+    }
 
     async function fetchSummary() {
       const summaryBox = document.getElementById('summary-content');
@@ -202,25 +174,77 @@
       summaryBox.innerHTML = '<p class="text-slate-400">Формирование сводки через DeepSeek...</p>';
 
       try {
-        const res = await fetch('https://n8n.novabase24.ru/webhook/kid-report');
+        // Точный рабочий вебхук сводки в n8n
+        const res = await fetch('https://n8n.novabase24.ru/webhook/kid-summary');
+        
+        if (!res.ok) {
+          throw new Error(`Ошибка сервера: ${res.status}`);
+        }
+
         const data = await res.json();
         
-        if (data && data.summary) {
-          const formatted = data.summary
-            .replace(/### (.*?)\n/g, '<h4 class="font-bold text-emerald-400 mt-2 mb-1">$1</h4>')
-            .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>')
-            .replace(/\n- /g, '<br>• ')
-            .replace(/\n\n/g, '<div class="h-1"></div>');
-          
-          summaryBox.innerHTML = formatted;
+        // 1. Отображение текста ответа AI
+        let summaryText = "";
+        if (typeof data === 'string') {
+          summaryText = data;
+        } else if (data.summary) {
+          summaryText = data.summary;
+        } else if (data.output) {
+          summaryText = data.output;
+        } else if (data.text) {
+          summaryText = data.text;
         } else {
-          summaryBox.innerHTML = '<p class="text-slate-400">Сводка получена.</p>';
+          summaryText = JSON.stringify(data, null, 2);
         }
+
+        summaryBox.innerHTML = formatMarkdown(summaryText);
+
+        // 2. Отрисовка реальных точек, если сервер передал координаты
+        const points = data.points || data.locations || (Array.isArray(data) ? data : null);
+        if (points && points.length > 0) {
+          const latLngs = points.map(p => [Number(p.lat || p.latitude), Number(p.lon || p.longitude)]);
+          
+          routeLine.setLatLngs(latLngs);
+          markersLayer.clearLayers();
+
+          points.forEach(p => {
+            const lat = Number(p.lat || p.latitude);
+            const lon = Number(p.lon || p.longitude);
+            const marker = L.circleMarker([lat, lon], {
+              radius: 5,
+              fillColor: '#0f172a',
+              color: '#10b981',
+              weight: 2,
+              fillOpacity: 1
+            });
+            if (p.address || p.time) {
+              marker.bindPopup(`<b>${p.address || 'Точка'}</b><br>${p.time || ''}`);
+            }
+            markersLayer.addLayer(marker);
+          });
+
+          const lastPoint = points[points.length - 1];
+          const lastLat = Number(lastPoint.lat || lastPoint.latitude);
+          const lastLon = Number(lastPoint.lon || lastPoint.longitude);
+
+          activeMarker.setLatLng([lastLat, lastLon]);
+          map.setView([lastLat, lastLon], 15);
+
+          if (lastPoint.address) {
+            document.getElementById('current-address').textContent = lastPoint.address;
+          }
+          document.getElementById('current-coords').textContent = `Координаты: ${lastLat.toFixed(5)}, ${lastLon.toFixed(5)}`;
+          if (lastPoint.battery) {
+            document.getElementById('battery-level').textContent = `${lastPoint.battery}%`;
+          }
+          document.getElementById('last-ping-time').textContent = 'сегодня';
+        }
+
       } catch (err) {
         summaryBox.innerHTML = `
           <div class="space-y-1">
-            <p class="text-amber-400 font-semibold">• Автономный режим</p>
-            <p class="text-slate-300">Ребёнок следовал привычному маршруту (Школа №3 → Сквер → Спортивная секция → Дом). Задержек и отклонений не зафиксировано, заряд в норме (65%).</p>
+            <p class="text-rose-400 font-semibold">• Ошибка получения сводки</p>
+            <p class="text-slate-400 text-[11px]">${err.message}. Проверьте, активен ли рабочий процесс в n8n.</p>
           </div>
         `;
       } finally {
